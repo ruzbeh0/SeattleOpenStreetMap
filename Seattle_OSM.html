@@ -11753,15 +11753,12 @@ div#notebook {
 <div class="text_cell_render border-box-sizing rendered_html">
 <h1 id="Seattle,-WA---OpenStreetMap-Data-Wrangling-with-MongoDB">Seattle, WA - OpenStreetMap Data Wrangling with MongoDB<a class="anchor-link" href="#Seattle,-WA---OpenStreetMap-Data-Wrangling-with-MongoDB">&#182;</a></h1><p>This project will wrangle and analyze data from the OpenStreetMap (OSM) project in the Seattle, WA area. The data also includes some data from locations in Canada. The data will be wrangled and stored in a NoSQL database: MongoDB.</p>
 <p>The data was downloaded from this link: <a href="https://mapzen.com/data/metro-extracts/metro/seattle_washington/">https://mapzen.com/data/metro-extracts/metro/seattle_washington/</a></p>
-<h2 id="Street-Names">Street Names<a class="anchor-link" href="#Street-Names">&#182;</a></h2><p>As part of this project, the street names will be standardized before the records are insterted in the database. In this dataset, a few incosistencies with street names and abbreviations were found. For example, there are several streets which include a compass direction in their name (Northeast, Northwest, Southeast, Southwest, etc). Different conventions were found, some streets were abbreviated as N.E. while others just used NE and some included the full word. The mapping below will be used to standardize those names.</p>
-<p>Below are some examples of street names that were standardized:</p>
-
-<pre><code>Fawcett Ave =&gt; Fawcett Avenue
-California Way SW =&gt; California Way Southwest
-Grandview Dr W =&gt; Grandview Dr West
-13th Ave NW =&gt; 13th Ave Northwest
-40th Ave. N.E. =&gt; 40th Ave. Northeast
-35th Avenue NE =&gt; 35th Avenue Northeast</code></pre>
+<h2 id="Problems-Ecountered-in-the-Dataset">Problems Ecountered in the Dataset<a class="anchor-link" href="#Problems-Ecountered-in-the-Dataset">&#182;</a></h2><p>While investigating the Seattle OSM dataset a few problems where noticed:</p>
+<ul>
+<li>Different standards for street name abbreviations. For example, there are several street names ending with the cardinal direction, and some streets use NE and others N.E. as an abbreviation for Northeast.</li>
+<li>Missing country, state or province attributes. This dataset includes locations that are in Canada and in the United States. There are records that have those attributes included while others do not.</li>
+<li>Inconsistent postal code standards. For US locations, there are postal codes in a five digit format (for example, 12345) while other locations have more than five digits (for example 12345-678)</li>
+</ul>
 <h2 id="OSM-Dataset-Overview">OSM Dataset Overview<a class="anchor-link" href="#OSM-Dataset-Overview">&#182;</a></h2><p>The uncompressed OSM dataset size is 1.61 GB and it has almost 8 million records as can be seen with the python code below:</p>
 <div class="highlight"><pre><span></span><span class="n">db</span><span class="o">.</span><span class="n">seattle_data</span><span class="o">.</span><span class="n">find</span><span class="p">()</span><span class="o">.</span><span class="n">count</span><span class="p">()</span>
 </pre></div>
@@ -11815,6 +11812,15 @@ result = db.seattle_data.aggregate([match, group, sort, limit])</code></pre>
 {u'_id': u'Sooke', u'count': 1600}
 {u'_id': u'Esquimalt', u'count': 1495}
 {u'_id': u'View Royal', u'count': 1012}</code></pre>
+<h2 id="Street-Names">Street Names<a class="anchor-link" href="#Street-Names">&#182;</a></h2><p>As part of this project, the street names will be standardized before the records are insterted in the database. In this dataset, a few incosistencies with street names and abbreviations were found. For example, there are several streets which include a compass direction in their name (Northeast, Northwest, Southeast, Southwest, etc). Different conventions were found, some streets were abbreviated as N.E. while others just used NE and some included the full word. The mapping below will be used to standardize those names.</p>
+<p>Below are some examples of street names that were standardized:</p>
+
+<pre><code>Fawcett Ave =&gt; Fawcett Avenue
+California Way SW =&gt; California Way Southwest
+Grandview Dr W =&gt; Grandview Dr West
+13th Ave NW =&gt; 13th Ave Northwest
+40th Ave. N.E. =&gt; 40th Ave. Northeast
+35th Avenue NE =&gt; 35th Avenue Northeast</code></pre>
 <h2 id="Country-Record-Location">Country Record Location<a class="anchor-link" href="#Country-Record-Location">&#182;</a></h2><p>A small portion of this dataset is located in Canada. In the next steps we are going to investigate if the records correctly reference the country in which they are located. We will start by grouping the country field and seeing which values are being used:</p>
 
 <pre><code>group = {"$group":{"_id":"$address.country", "count":{"$sum":1}}}
@@ -11866,10 +11872,7 @@ result = db.seattle_data.aggregate([group, limit])</code></pre>
           ,{"address.state" : {"$eq" : "WA."}}, {"address.state" : {"$eq" : "WA - Washington"}}\
                                      ]}, {"$set" : {"address.state" : "WA" } })
 db.seattle_data.update_many({"address.state" : {"$eq" : "WA"}}, {"$set" : {"address.country" : "US" } })</code></pre>
-<p>It is important that a dataset such as this has complete and standardized information. This would be useful in case we were interested in grouping the data by country, state, province or another address attribute. However, this is not true for this data.</p>
-<p>The country updates that we performed will fix the country, state and province for some of the nodes. As can be verified in the query below, the number of US and CA records has increased. However, there are still some records with incorrect state and country information that we have not treated. Also, the great majority of the records do not have state, country or province information, making it more difficult to identify which country the belong to.</p>
-<p>A more efficient way to update the adress attibutes would be to use geographic coordinates of those nodes and ways. The nodes and ways coordinates could be compared with through a spatial join with a country gis layer. Using this method points inside each country would be marked correctly.</p>
-<p>This would be better than using the approach that we used in this project as would be able wrangle all records which have coordinates. But, there could be potential records which have all attributes labeled correctly but the wrong coordinates, in this case this method would lead to error. However, for this specific case the advantages would be higher than the disadvantages.</p>
+<p>As can be verified in the query below, the number of US and CA records has increased. However, there are still some records with incorrect state and country information that we have not treated.</p>
 
 <pre><code>group = {"$group":{"_id":"$address.country", "count":{"$sum":1}}}
 limit = {"$limit": 100}
@@ -11913,6 +11916,11 @@ match2 = {"$match":{"address.postcode":{"$not" : re.compile("^\d{5}$")}}}
 group = {"$group":{"_id":"1", "count":{"$sum":1}}}
 
 result = db.seattle_data.aggregate([match1, match2, group])</code></pre>
+<h2 id="Conclusion">Conclusion<a class="anchor-link" href="#Conclusion">&#182;</a></h2><p>It is important that a dataset such as this has complete and standardized information. This would be useful in case we were interested in grouping the data by country, state, province or another address attribute. It would also be useful if we needed to classify street names by their cardinal direction and needed to search them for a specific direction.</p>
+<p>The country updates that we performed will fix the country, state and province for some of the nodes. However, there are several records that are missing the state, province or country information, aking it more difficult to identify which country, state or province they belong to.</p>
+<p>A more efficient way to update the address attibutes would be to use geographic coordinates of those nodes and ways. The nodes and ways coordinates could be compared with through a spatial join with a country gis layer. Using this method each record would be marked correctly to the corresponding country.</p>
+<p>This would be an efficient way to add these attributes and better than the approach that we used in this project, as it would be able wrangle all records which have coordinates. But, there could be some records which have incorrect 
+coordinates, in those cases this method would lead to error. However, the benefits of adding country, state or province attributes to all records would outweigh the few records that could be incorrectly geocoded.</p>
 
 </div>
 </div>
